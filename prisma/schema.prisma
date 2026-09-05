@@ -1,0 +1,367 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  role      String   // Using String for role since SQLite doesn't natively support ENUMs easily without string constraints
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  merchant     Merchant?
+  customer     CustomerProfile?
+  conversations Conversation[]
+}
+
+model Merchant {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  products     Product[]
+  customers    MerchantCustomer[]
+  orders       Order[]
+  payments     Payment[]
+  carts            Cart[]
+  paymentLinks     PaymentLink[]
+  recoveryAttempts RecoveryAttempt[]
+  campaigns        Campaign[]
+}
+
+model CustomerProfile {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  firstName String?
+  lastName  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentType String    // CUSTOMER_SHOPPING | MERCHANT_REVENUE
+  title     String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
+model AgentRun {
+  id             String        @id @default(cuid())
+  conversationId String
+  agentType      String
+  status         String        // STARTED, COMPLETED, FAILED
+  metadata       String?       // JSON string for extra context
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  actions        AgentAction[]
+
+  @@index([conversationId])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String       // USER | ASSISTANT | SYSTEM | TOOL
+  content        String
+  inputType      String       // TEXT | VOICE | TOOL
+  createdAt      DateTime     @default(now())
+
+  agentActions   AgentAction[]
+
+  @@index([conversationId])
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  name        String
+  description String?
+  pricePaise  Int
+  inventory   Int      @default(0)
+  category    String?
+  imageUrl    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orderItems  OrderItem[]
+  cartItems   CartItem[]
+  campaigns   Campaign[]
+
+  @@index([merchantId])
+}
+
+model MerchantCustomer {
+  id          String   @id @default(cuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  name        String
+  email       String
+  phone       String?
+  aiPurchaseEnabled Boolean @default(false)
+  emailMarketingOptIn Boolean @default(true)
+  smsMarketingOptIn Boolean @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  orders           Order[]
+  carts            Cart[]
+  payments         Payment[]
+  recoveryAttempts RecoveryAttempt[]
+  savedPaymentMethods SavedPaymentMethod[]
+  campaignDeliveries CampaignDelivery[]
+
+  @@index([merchantId])
+}
+
+model Order {
+  id                 String   @id @default(cuid())
+  merchantId         String
+  merchant           Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchantCustomerId String
+  customer           MerchantCustomer @relation(fields: [merchantCustomerId], references: [id], onDelete: Cascade)
+  orderNumber        String   @unique
+  status             String   // PENDING, PAID, CANCELLED
+  fulfillmentStatus  String   @default("PENDING") // PENDING, FULFILLED, REQUIRES_RECONCILIATION
+  totalPaise         Int
+  razorpayOrderId    String?  @unique
+  origin             String   @default("STOREFRONT") // STOREFRONT, AI_BUYER
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  items              OrderItem[]
+  payments           Payment[]
+  paymentLinks       PaymentLink[]
+  recoveryAttempts   RecoveryAttempt[]
+
+  @@index([merchantId])
+  @@index([merchantCustomerId])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+  pricePaise Int
+
+  @@index([orderId])
+  @@index([productId])
+}
+
+model Payment {
+  id                 String   @id @default(cuid())
+  merchantId         String
+  merchant           Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  orderId            String?
+  order              Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  merchantCustomerId String
+  customer           MerchantCustomer @relation(fields: [merchantCustomerId], references: [id], onDelete: Cascade)
+  amountPaise        Int
+  status             String   // PENDING, SUCCESS, FAILED
+  method             String   // CARD, UPI, NETBANKING, PAYMENT_LINK
+  razorpayPaymentId  String?  @unique
+  razorpayOrderId    String?
+  razorpayPaymentLinkId String?
+  paidAt             DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  recoveryAttempts   RecoveryAttempt[]
+
+  @@index([merchantId])
+  @@index([orderId])
+  @@index([merchantCustomerId])
+}
+
+model Cart {
+  id                 String   @id @default(cuid())
+  merchantId         String
+  merchant           Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchantCustomerId String
+  customer           MerchantCustomer @relation(fields: [merchantCustomerId], references: [id], onDelete: Cascade)
+  status             String   // ACTIVE, ABANDONED, CONVERTED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  items              CartItem[]
+  recoveryAttempts   RecoveryAttempt[]
+
+  @@index([merchantId])
+  @@index([merchantCustomerId])
+}
+
+model CartItem {
+  id        String   @id @default(cuid())
+  cartId    String
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity  Int
+
+  @@index([cartId])
+  @@index([productId])
+}
+
+model AgentAction {
+  id             String    @id @default(cuid())
+  conversationId String
+  agentRunId     String?
+  agentRun       AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  messageId      String?
+  message        Message?  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  merchantId     String
+  toolName       String
+  inputJson      String
+  outputJson     String?
+  status         String    // STARTED, SUCCEEDED, FAILED
+  createdAt      DateTime  @default(now())
+
+  @@index([conversationId])
+  @@index([agentRunId])
+  @@index([messageId])
+  @@index([merchantId])
+}
+
+model PaymentLink {
+  id                 String   @id @default(cuid())
+  merchantId         String
+  merchant           Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  orderId            String
+  order              Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  razorpayPaymentLinkId String @unique
+  url                String
+  status             String   // CREATED, PAID, EXPIRED, CANCELLED
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  recoveryAttempts   RecoveryAttempt[]
+
+  @@index([merchantId])
+  @@index([orderId])
+}
+
+model WebhookEvent {
+  id               String   @id @default(cuid())
+  eventType        String
+  payloadJson      String
+  deduplicationKey String   @unique
+  processedAt      DateTime?
+  createdAt        DateTime @default(now())
+}
+
+model RecoveryAttempt {
+  id                 String   @id @default(cuid())
+  merchantId         String
+  merchant           Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  merchantCustomerId String
+  customer           MerchantCustomer @relation(fields: [merchantCustomerId], references: [id], onDelete: Cascade)
+  
+  cartId             String?
+  cart               Cart?    @relation(fields: [cartId], references: [id], onDelete: SetNull)
+  paymentId          String?
+  payment            Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  orderId            String?
+  order              Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  
+  reason             String   // FAILED_PAYMENT, ABANDONED_CART
+  strategy           String   
+  status             String   // PENDING, LINK_CREATED, MESSAGE_SENT, CUSTOMER_CLICKED, PAYMENT_SUCCESS, FAILED, EXPIRED, CANCELLED
+  amountPaise        Int
+  
+  paymentLinkId      String?
+  paymentLink        PaymentLink? @relation(fields: [paymentLinkId], references: [id], onDelete: SetNull)
+  messageSent        String?
+  
+  completedAt        DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([merchantId])
+  @@index([merchantCustomerId])
+  @@index([cartId])
+  @@index([paymentId])
+  @@index([orderId])
+  @@index([status])
+}
+
+model SavedPaymentMethod {
+  id                 String   @id @default(cuid())
+  merchantCustomerId String
+  customer           MerchantCustomer @relation(fields: [merchantCustomerId], references: [id], onDelete: Cascade)
+  provider           String   @default("DEMO") // e.g. DEMO, RAZORPAY
+  providerToken      String?  // Real provider token
+  brand              String   // e.g. Visa
+  last4              String   // e.g. 4242
+  type               String   // e.g. CARD
+  status             String   @default("ACTIVE") // ACTIVE, FAILED, EXPIRED
+  isDefault          Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([merchantCustomerId])
+}
+
+model Campaign {
+  id               String   @id @default(cuid())
+  merchantId       String
+  merchant         Merchant @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+  name             String
+  objective        String
+  status           String   // DRAFT, READY, SENDING, SENT, PARTIALLY_SENT, FAILED
+  channel          String   // EMAIL, SMS, WHATSAPP, MIXED
+  audienceCriteria String   // JSON string of criteria
+  audienceCount    Int      @default(0)
+  message          String
+  cta              String?
+  productId        String?
+  product          Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  sentAt           DateTime?
+
+  deliveries       CampaignDelivery[]
+
+  @@index([merchantId])
+}
+
+model CampaignDelivery {
+  id                 String   @id @default(cuid())
+  campaignId         String
+  campaign           Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  merchantCustomerId String
+  customer           MerchantCustomer @relation(fields: [merchantCustomerId], references: [id], onDelete: Cascade)
+  channel            String
+  destination        String
+  status             String   // ACCEPTED, DELIVERED, FAILED
+  providerMessageId  String?
+  errorMessage       String?
+  sentAt             DateTime?
+  deliveredAt        DateTime?
+  createdAt          DateTime @default(now())
+
+  @@index([campaignId])
+  @@index([merchantCustomerId])
+}
