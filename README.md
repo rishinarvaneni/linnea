@@ -1,79 +1,115 @@
-# Agent Platform (Phase 1 & 2)
+# Linnéa
 
-This is the foundational setup for the Razorpay Test Mode AI Agent Platform. It implements a clean Next.js architecture with role-based authentication using custom secure JWT session cookies and Prisma with SQLite.
+### AI-Native Agentic Commerce & Revenue Growth Platform
 
-## Tech Stack
-- Next.js (App Router, Server Actions)
-- TypeScript
-- Tailwind CSS
-- Prisma (SQLite for local dev)
-- `jose` (JWT signing/verification)
-- `bcryptjs` (Password hashing)
+> **Different AI interfaces. One commerce engine. Real revenue.**
 
-## Project Structure
-- `src/app/page.tsx`: Role selection landing page
-- `src/app/login/page.tsx`: Shared login page adapting to role
-- `src/app/register/page.tsx`: Shared registration page adapting to role
-- `src/app/dashboard/page.tsx`: Protected Merchant Workspace
-- `src/app/shop/page.tsx`: Protected Customer Store
-- `src/app/actions/auth.ts`: Server Actions for register/login/logout
-- `src/lib/session.ts`: JWT session utilities using `jose`
-- `src/lib/db.ts`: Prisma client initialization
-- `src/middleware.ts`: JWT verification and role-based redirect protection
-- `prisma/schema.prisma`: Database schema definition
-- `prisma/seed.ts`: Seed data
+Linnéa is an AI-native commerce platform that connects customers, merchants, and external AI agents through a unified and secure commerce infrastructure.
 
-## Environment Variables
-Copy `.env.example` to `.env` if not already present.
-```
-DATABASE_URL="file:./dev.db"
-GOOGLE_API_KEY="your-google-ai-studio-api-key"
-GEMINI_MODEL="gemini-3.5-flash"
-```
+It combines conversational shopping, autonomous revenue agents, protocol-based AI commerce, payment orchestration, revenue recovery, and campaign automation into a single platform.
 
-> **Note:** The `GOOGLE_API_KEY` must remain a server-side secret and is used by the LangChain + Google Gemini AI implementation.
-> The `GEMINI_MODEL` can be configured here to control which model is utilized (e.g. `gemini-3.5-flash` or `gemini-1.5-pro`).
+---
 
-## AI Agent Architecture (LangChain + Gemini)
-The platform uses an intelligent agent architecture utilizing LangChain's Tool-Calling Agent and Google Gemini.
-- **Merchant Agent (`src/lib/ai/agent.ts`)**: Acts as a revenue analyst, examining failed payments, identifying opportunities, and creating payment links. 
-- **Customer Agent (`src/lib/ai/customer-agent.ts`)**: Acts as a smart shopping assistant, searching the merchant catalog, adding items to the cart, and guiding the customer to Razorpay checkout.
-- **AgentRun & AgentAction**: Every time a user messages an AI agent, an `AgentRun` is recorded in the database. When the LLM invokes tools (such as searching products or analyzing revenue), each tool invocation is recorded as an `AgentAction` tied to that run. This enables deep observability.
-- **Memory**: The conversational memory is driven by the persistent `Message` database model rather than an external memory store.
+## 🚀 What is Linnéa?
 
-## Database Setup & Commands
+Traditional e-commerce separates the customer experience, merchant analytics, marketing, and payment infrastructure.
 
-Run database migrations:
-```bash
-npx prisma db push
-```
+Linnéa brings these capabilities together through an **AI-driven Commerce Engine**.
 
-Run seed script:
-```bash
-npx tsx prisma/seed.ts
-```
+Customers can interact with an AI shopping agent using natural language:
 
-Start the development server:
-```bash
-npm run dev
-```
+> "Find me wireless headphones under ₹5,000."
 
-## Demo Login Credentials
+Merchants can use specialized AI agents to:
 
-**Merchant:**
-- Email: `merchant@example.com`
-- Password: `DemoMerchant123!`
+- Analyze revenue
+- Recover failed payments
+- Identify abandoned carts
+- Generate campaigns
+- Discover upselling and cross-selling opportunities
 
-**Customer:**
-- Email: `customer@example.com`
-- Password: `DemoCustomer123!`
+External AI agents can also interact with the commerce system through protocol-based interfaces such as **MCP**.
 
-## Current Implementation (Phase 1 & 2)
-- Initializing the Next.js project.
-- Setting up the database schema and seed data.
-- Implementing robust custom JWT-based authentication using server actions.
-- Role-based route protection with Next.js Middleware.
+The core principle is:
 
-## Planned Phases
-- **Phase 3:** Agent Studio UI, AI Agents, AI Chat, Razorpay integrations, products, carts, and revenue recovery features.
-# linnea
+> **AI handles reasoning. The Commerce Engine handles deterministic commerce operations.**
+
+---
+
+# 🏗️ Architecture
+
+![Linnéa Architecture](docs/architecture.png)
+
+### High-Level Architecture
+
+```mermaid
+flowchart TB
+
+    C[Customer<br/>Chat / Voice]
+    B[AI Buyer Agent<br/>Google Gemini + LangChain]
+
+    M[Merchant]
+    AS[Agent Studio]
+
+    RG[Revenue Growth Agent]
+    RR[Revenue Recovery Agent]
+    CO[Campaign Orchestrator]
+
+    E[External AI Agents<br/>Claude / ChatGPT / Other Agents]
+    P[Protocol Abstraction Layer]
+    MCP[MCP]
+    FUTURE[Future Protocols]
+
+    INT[Commerce Intent]
+
+    SEC[Policy & Security Layer]
+
+    CE[Commerce Engine]
+
+    PS[Product Service]
+    CS[Cart Service]
+    OS[Order Service]
+    IS[Inventory Control]
+    PAY[Payment Orchestration]
+    RS[Recovery Service]
+    CAS[Campaign Service]
+
+    DB[(Prisma + SQLite)]
+
+    R[Razorpay]
+    WH[Razorpay Webhooks]
+
+    C --> B
+    B --> CE
+
+    M --> AS
+    AS --> RG
+    AS --> RR
+    AS --> CO
+
+    RG --> CE
+    RR --> CE
+    CO --> CE
+
+    E --> P
+    P --> MCP
+    P --> FUTURE
+    MCP --> INT
+    FUTURE --> INT
+    INT --> CE
+
+    SEC <--> CE
+
+    CE --> PS
+    CE --> CS
+    CE --> OS
+    CE --> IS
+    CE --> PAY
+    CE --> RS
+    CE --> CAS
+
+    CE <--> DB
+
+    PAY --> R
+    R --> WH
+    WH --> CE
